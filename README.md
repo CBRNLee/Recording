@@ -19,6 +19,12 @@ pip install opencv-python face_recognition scikit-learn numpy
 ```
 
 ## 사용 예시
+### 0) 빠른 시연(의존성 없이 출력 포맷 확인)
+```bash
+python transcribe_draft.py ./anything.wav -o ./demo_draft.txt --demo --enable-video-person
+```
+> `--demo`는 실제 전사를 수행하지 않고 샘플 결과 파일을 만들어 출력 형식을 확인합니다.
+
 ### 1) 한국어 전사(기본)
 ```bash
 python transcribe_draft.py ./sample.wav -o ./sample_draft.txt

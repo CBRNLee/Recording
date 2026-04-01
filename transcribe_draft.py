@@ -143,6 +143,21 @@ def assign_person_to_segments(segments: list[dict], windows: list[PersonWindow])
 
 
 def run(args: argparse.Namespace) -> None:
+    if args.demo:
+        demo_segments = [
+            {"start": 0.50, "end": 3.20, "speaker": "SPEAKER_00", "person": "PERSON_00", "text": "안녕하세요. 오늘 인터뷰 시작하겠습니다."},
+            {"start": 3.50, "end": 6.10, "speaker": "SPEAKER_01", "person": "PERSON_01", "text": "네, 반갑습니다. 자기소개 부탁드립니다."},
+            {"start": 6.50, "end": 10.00, "speaker": "SPEAKER_00", "person": "PERSON_00", "text": "저는 음성 인식 프로젝트를 담당하고 있습니다."},
+        ]
+        output_txt = Path(args.output)
+        include_person = bool(args.enable_video_person)
+        output_txt.write_text(format_draft(demo_segments, include_person=include_person), encoding="utf-8")
+        output_json = output_txt.with_suffix(".json")
+        output_json.write_text(json.dumps(demo_segments, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[DEMO] 초안 전사 저장: {output_txt}")
+        print(f"[DEMO] 세그먼트 JSON 저장: {output_json}")
+        return
+
     try:
         import whisperx  # type: ignore
     except ImportError as exc:
@@ -215,6 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="동영상에서 얼굴 클러스터링으로 PERSON 라벨 자동 부여",
     )
     parser.add_argument("--video-sample-every", type=float, default=1.0, help="영상 샘플링 간격(초)")
+    parser.add_argument("--demo", action="store_true", help="실제 모델 실행 없이 샘플 전사 결과를 생성")
     return parser
 
 
