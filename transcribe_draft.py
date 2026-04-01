@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -142,6 +143,78 @@ def assign_person_to_segments(segments: list[dict], windows: list[PersonWindow])
     return segments
 
 
+def upload_to_firebase(
+    args: argparse.Namespace,
+    input_path: Path,
+    output_txt: Path,
+    output_json: Path,
+    segments: list[dict],
+) -> None:
+    try:
+        import firebase_admin  # type: ignore
+        from firebase_admin import credentials, firestore, storage  # type: ignore
+    except ImportError as exc:
+        raise SystemExit("Firebase 업로드를 사용하려면 `pip install firebase-admin`이 필요합니다.") from exc
+
+    if args.firebase_use_emulator:
+        host = args.firebase_emulator_host
+        os.environ["FIRESTORE_EMULATOR_HOST"] = f"{host}:8080"
+        os.environ["FIREBASE_AUTH_EMULATOR_HOST"] = f"{host}:9099"
+        os.environ["FIREBASE_STORAGE_EMULATOR_HOST"] = f"http://{host}:9199"
+
+    service_account = args.firebase_service_account or os.getenv("FIREBASE_SERVICE_ACCOUNT")
+    project_id = args.firebase_project_id or os.getenv("FIREBASE_PROJECT_ID")
+    storage_bucket = args.firebase_storage_bucket or os.getenv("FIREBASE_STORAGE_BUCKET")
+
+    if not project_id:
+        raise SystemExit("Firebase 업로드에는 project_id가 필요합니다. --firebase-project-id 또는 FIREBASE_PROJECT_ID를 설정하세요.")
+    if not storage_bucket:
+        raise SystemExit(
+            "Firebase 업로드에는 storage bucket이 필요합니다. --firebase-storage-bucket 또는 FIREBASE_STORAGE_BUCKET을 설정하세요."
+        )
+
+    init_kwargs = {"projectId": project_id, "storageBucket": storage_bucket}
+    if not firebase_admin._apps:
+        if service_account:
+            cred = credentials.Certificate(service_account)
+            firebase_admin.initialize_app(cred, init_kwargs)
+        else:
+            firebase_admin.initialize_app(options=init_kwargs)
+
+    db = firestore.client()
+    bucket = storage.bucket()
+
+    doc_ref = db.collection(args.firebase_collection).document()
+    doc_id = doc_ref.id
+    base_path = f"transcripts/{doc_id}"
+
+    media_blob = bucket.blob(f"{base_path}/input{input_path.suffix.lower()}")
+    media_blob.upload_from_filename(str(input_path))
+    txt_blob = bucket.blob(f"{base_path}/transcript.txt")
+    txt_blob.upload_from_filename(str(output_txt))
+    json_blob = bucket.blob(f"{base_path}/segments.json")
+    json_blob.upload_from_filename(str(output_json))
+
+    doc_ref.set(
+        {
+            "docId": doc_id,
+            "inputFileName": input_path.name,
+            "language": args.language,
+            "model": args.model,
+            "segmentsCount": len(segments),
+            "firebaseEmulator": bool(args.firebase_use_emulator),
+            "storagePaths": {
+                "input": media_blob.name,
+                "transcriptTxt": txt_blob.name,
+                "segmentsJson": json_blob.name,
+            },
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        }
+    )
+
+    print(f"Firebase 업로드 완료: collection={args.firebase_collection}, docId={doc_id}")
+
+
 def run(args: argparse.Namespace) -> None:
     if args.demo:
         demo_segments = [
@@ -202,6 +275,9 @@ def run(args: argparse.Namespace) -> None:
     print(f"초안 전사 저장: {output_txt}")
     print(f"세그먼트 JSON 저장: {output_json}")
 
+    if args.firebase_upload:
+        upload_to_firebase(args, input_path=input_path, output_txt=output_txt, output_json=output_json, segments=segments)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="한국어 중심 전사 + 화자/인물 분리 초안 생성")
@@ -231,6 +307,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--video-sample-every", type=float, default=1.0, help="영상 샘플링 간격(초)")
     parser.add_argument("--demo", action="store_true", help="실제 모델 실행 없이 샘플 전사 결과를 생성")
+
+    # Firebase 연동(선택)
+    parser.add_argument("--firebase-upload", action="store_true", help="전사 결과를 Firebase Firestore/Storage로 업로드")
+    parser.add_argument("--firebase-project-id", default="", help="Firebase 프로젝트 ID")
+    parser.add_argument("--firebase-service-account", default="", help="서비스 계정 JSON 파일 경로")
+    parser.add_argument("--firebase-storage-bucket", default="", help="Firebase Storage 버킷명")
+    parser.add_argument("--firebase-collection", default="transcriptions", help="Firestore 컬렉션명")
+    parser.add_argument("--firebase-use-emulator", action="store_true", help="Firebase Emulator Suite로 업로드")
+    parser.add_argument("--firebase-emulator-host", default="127.0.0.1", help="Emulator 호스트")
     return parser
 
 

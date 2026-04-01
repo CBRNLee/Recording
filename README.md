@@ -85,3 +85,39 @@ firebase emulators:start
 ```
 
 > 이 저장소는 Firebase 코드를 사용하지 않으므로, 위 단계는 “안전한 로컬 에뮬레이터 환경” 준비용입니다.
+
+## Firebase 연결(신규)
+전사 결과를 Firestore/Storage에 올리려면 아래 옵션을 사용하세요.
+
+### 추가 설치
+```bash
+pip install firebase-admin
+```
+
+### 필수 값
+- `FIREBASE_PROJECT_ID` 또는 `--firebase-project-id`
+- `FIREBASE_STORAGE_BUCKET` 또는 `--firebase-storage-bucket`
+- (권장) `FIREBASE_SERVICE_ACCOUNT` 또는 `--firebase-service-account`
+
+### 실서비스 업로드 예시
+```bash
+python transcribe_draft.py ./sample.wav -o ./sample_draft.txt \
+  --hf-token YOUR_HF_TOKEN \
+  --firebase-upload \
+  --firebase-project-id YOUR_PROJECT_ID \
+  --firebase-storage-bucket YOUR_PROJECT_ID.firebasestorage.app \
+  --firebase-service-account ./serviceAccount.json
+```
+
+### Emulator 업로드 예시(안전 시연)
+```bash
+python transcribe_draft.py ./sample.wav -o ./sample_draft.txt \
+  --firebase-upload \
+  --firebase-use-emulator \
+  --firebase-project-id demo-recording \
+  --firebase-storage-bucket demo-recording.firebasestorage.app
+```
+
+업로드 시 다음이 자동 수행됩니다.
+- Storage: 원본 입력 파일 + `transcript.txt` + `segments.json` 저장
+- Firestore: 메타데이터 문서(`docId`, 파일명, 세그먼트 수, 저장 경로, 생성 시각) 저장
