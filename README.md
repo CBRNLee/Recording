@@ -55,3 +55,33 @@ python transcribe_draft.py ./sample.mp4 -o ./sample_draft.txt --enable-video-per
 - `SPEAKER_XX`는 음성 기반 추정입니다.
 - `PERSON_XX`는 영상 프레임의 얼굴 기반 추정입니다.
 - 두 라벨은 초안 단계 자동 매핑이므로, 최종본에는 수동 검수 권장.
+
+## Firebase 분석 (현재 저장소 기준)
+- Auth: 사용 안 함
+- Firestore: 사용 안 함
+- Functions: 사용 안 함
+- Hosting: 사용 안 함
+- Storage: 사용 안 함
+
+현재 코드는 로컬 Python CLI(`transcribe_draft.py`) 단독 실행 구조이며, Firebase SDK/설정 파일(`firebase.json`, `.firebaserc`)이 없습니다.
+
+### 안전한 로컬 시연(Emulator Suite) 제안
+실서비스 연결 없이 Firebase Emulator Suite만 체험하려면, 별도 데모 프로젝트 ID를 사용하세요.
+
+```bash
+# 1) Firebase CLI 설치 (없는 경우)
+npm i -g firebase-tools
+
+# 2) 로그인
+firebase login
+
+# 3) 현재 폴더에서 에뮬레이터 초기화 (데모용)
+firebase init emulators
+# - Project: "Create a new project alias" 선택 후 demo-recording 로 지정 권장
+# - Emulators: Auth / Firestore / Functions / Hosting / Storage 중 필요한 항목 선택
+
+# 4) 에뮬레이터 실행
+firebase emulators:start
+```
+
+> 이 저장소는 Firebase 코드를 사용하지 않으므로, 위 단계는 “안전한 로컬 에뮬레이터 환경” 준비용입니다.
